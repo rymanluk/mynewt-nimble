@@ -3698,6 +3698,19 @@ conn_rx_data_pdu_end:
     os_mbuf_free_chain(rxpdu);
 }
 
+static void
+ble_ll_conn_check_phy_update(struct ble_ll_conn_sm *connsm, uint8_t opcode, uint8_t *ctrdata)
+{
+    uint8_t tx_phy;
+
+    tx_phy = ctrdata[0];
+
+    if (opcode == BLE_LL_CTRL_PHY_UPDATE_IND) {
+        connsm->phy_tx_mod_transition = tx_phy;
+        return;
+    }
+}
+
 /**
  * Called when a packet has been received while in the connection state.
  *
@@ -3813,6 +3826,12 @@ ble_ll_conn_rx_isr_end(uint8_t *rxbuf, struct ble_mbuf_hdr *rxhdr)
         /* Set last received header byte */
         connsm->last_rxd_hdr_byte = hdr_byte;
 
+        is_ctrl = 0;
+        if ((hdr_byte & BLE_LL_DATA_HDR_LLID_MASK) == BLE_LL_LLID_CTRL) {
+            is_ctrl = 1;
+            opcode = rxbuf[2];
+        }
+
         /*
          * If SN bit from header does not match NESN in connection, this is
          * a resent PDU and should be ignored.
@@ -3894,10 +3913,13 @@ ble_ll_conn_rx_isr_end(uint8_t *rxbuf, struct ble_mbuf_hdr *rxhdr)
                         os_mbuf_free_chain(txpdu);
                         connsm->cur_tx_pdu = NULL;
                     } else {
-                        /*  XXX: TODO need to check with phy update procedure.
-                         *  There are limitations if we have started update */
                         rem_bytes = OS_MBUF_PKTLEN(txpdu) - txhdr->txinfo.offset;
                         /* Adjust payload for max TX time and octets */
+
+                        if (is_ctrl && (connsm->conn_role == BLE_LL_CONN_ROLE_SLAVE)) {
+                            ble_ll_conn_check_phy_update(connsm, opcode, &rxbuf[3]);
+                        }
+
                         rem_bytes = ble_ll_conn_adjust_pyld_len(connsm, rem_bytes);
                         txhdr->txinfo.pyld_len = rem_bytes;
                     }
@@ -3908,12 +3930,6 @@ ble_ll_conn_rx_isr_end(uint8_t *rxbuf, struct ble_mbuf_hdr *rxhdr)
         /* Should we continue connection event? */
         /* If this is a TERMINATE_IND, we have to reply */
 chk_rx_terminate_ind:
-        is_ctrl = 0;
-        if ((hdr_byte & BLE_LL_DATA_HDR_LLID_MASK) == BLE_LL_LLID_CTRL) {
-            is_ctrl = 1;
-            opcode = rxbuf[2];
-        }
-
         /* If we received a terminate IND, we must set some flags */
         if (is_ctrl && (opcode == BLE_LL_CTRL_TERMINATE_IND)
                     && (rx_pyld_len == (1 + BLE_LL_CTRL_TERMINATE_IND_LEN))) {
