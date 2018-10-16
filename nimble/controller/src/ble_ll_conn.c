@@ -1038,8 +1038,19 @@ ble_ll_conn_adjust_pyld_len(struct ble_ll_conn_sm *connsm, uint16_t pyld_len)
     uint16_t ret;
 
 #if (BLE_LL_BT5_PHY_SUPPORTED == 1)
+    uint8_t phy_mode;
+
+    if (connsm->phy_tx_mod_transition != BLE_PHY_TRANSITION_MODE_NONE) {
+        phy_mode = ble_ll_phy_to_phy_mode(connsm->phy_tx_mod_transition,
+                                          connsm->phy_data.phy_options);
+    } else {
+        phy_mode = ble_ll_phy_to_phy_mode(connsm->phy_data.tx_phy_mode,
+                                          connsm->phy_data.phy_options);
+    }
+
     phy_max_tx_octets = ble_ll_pdu_max_tx_octets_get(connsm->eff_max_tx_time,
-                                                     connsm->phy_data.tx_phy_mode);
+                                                     phy_mode);
+
 #else
     phy_max_tx_octets = ble_ll_pdu_max_tx_octets_get(connsm->eff_max_tx_time,
                                                      BLE_PHY_MODE_1M);
@@ -1938,6 +1949,7 @@ ble_ll_conn_sm_new(struct ble_ll_conn_sm *connsm)
     connsm->phy_data.host_pref_tx_phys_mask = g_ble_ll_data.ll_pref_tx_phys;
     connsm->phy_data.host_pref_rx_phys_mask = g_ble_ll_data.ll_pref_rx_phys;
     connsm->phy_data.phy_options = 0;
+    connsm->phy_tx_mod_transition = BLE_PHY_TRANSITION_MODE_NONE;
 #endif
 
     /* Reset current control procedure */
