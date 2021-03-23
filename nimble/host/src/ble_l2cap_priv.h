@@ -62,6 +62,7 @@ typedef int ble_l2cap_rx_fn(struct ble_l2cap_chan *chan);
 
 struct ble_l2cap_chan {
     SLIST_ENTRY(ble_l2cap_chan) next;
+    bool disconnecting;
     uint16_t conn_handle;
     uint16_t dcid;
     uint16_t scid;
