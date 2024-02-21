@@ -38,7 +38,7 @@ uint16_t g_bleuart_attr_write_handle;
 /* Pointer to a console buffer */
 char *console_buf;
 
-uint16_t g_console_conn_handle;
+uint16_t g_console_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 /**
  * The vendor specific "bleuart" service consists of one write no-rsp characteristic
  * and one notification only read charateristic
@@ -102,10 +102,12 @@ gatt_svr_chr_access_uart_write(uint16_t conn_handle, uint16_t attr_handle,
     switch (ctxt->op) {
         case BLE_GATT_ACCESS_OP_WRITE_CHR:
               while(om) {
-                  console_write((char *)om->om_data, om->om_len);
+                  for (int i = 0; i < om->om_len; i++) {
+                      console_handle_char(om->om_data[i]);
+                  }
                   om = SLIST_NEXT(om, om_next);
               }
-              console_write("\n", 1);
+              console_handle_char('\n');
               return 0;
         default:
             assert(0);
@@ -141,35 +143,35 @@ err:
 /**
  * Reads console and sends data over BLE
  */
-static void
-bleuart_uart_read(void)
+int
+bleuart_uart_read(int c)
 {
-    int rc;
-    int off;
-    int full_line;
+    static int off = 0;
     struct os_mbuf *om;
 
-    off = 0;
-    while (1) {
-        rc = console_read(console_buf + off,
-                          MYNEWT_VAL(BLEUART_MAX_INPUT) - off, &full_line);
-        if (rc <= 0 && !full_line) {
-            continue;
-        }
-        off += rc;
-        if (!full_line) {
-            continue;
-        }
-
-        om = ble_hs_mbuf_from_flat(console_buf, off);
-        if (!om) {
-            return;
-        }
-        ble_gatts_notify_custom(g_console_conn_handle,
-                                g_bleuart_attr_read_handle, om);
-        off = 0;
-        break;
+    if (g_console_conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        return 0;
     }
+
+    if (c == '\n') {
+        console_buf[off++] = '\r';
+    }
+
+    console_buf[off++] = c;
+
+    if (c != '\n') {
+        return 0;
+    }
+
+    om = ble_hs_mbuf_from_flat(console_buf, off);
+    if (!om) {
+        return 0;
+    }
+    ble_gatts_notify_custom(g_console_conn_handle,
+                            g_bleuart_attr_read_handle, om);
+    off = 0;
+
+    return 0;
 }
 
 /**
@@ -191,11 +193,10 @@ void
 bleuart_init(void)
 {
     int rc;
-
     /* Ensure this function only gets called by sysinit. */
     SYSINIT_ASSERT_ACTIVE();
 
-    rc = console_init(bleuart_uart_read);
+    rc = console_ble_uart_init(bleuart_uart_read);
     SYSINIT_PANIC_ASSERT(rc == 0);
 
     console_buf = malloc(MYNEWT_VAL(BLEUART_MAX_INPUT));
