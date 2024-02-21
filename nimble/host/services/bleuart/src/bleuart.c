@@ -25,7 +25,7 @@
 #include "sysinit/sysinit.h"
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
-#include "bleuart/bleuart.h"
+#include "services/bleuart/bleuart.h"
 #include "os/endian.h"
 #include "console/console.h"
 
