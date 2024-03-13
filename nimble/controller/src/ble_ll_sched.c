@@ -101,7 +101,7 @@ preempt_none(struct ble_ll_sched_item *sch,
     return 0;
 }
 
-static int
+ int
 preempt_any_except_conn(struct ble_ll_sched_item *sch,
                         struct ble_ll_sched_item *item)
 {
@@ -385,7 +385,8 @@ ble_ll_sched_conn_reschedule(struct ble_ll_conn_sm *connsm)
         return -1;
     }
 
-    rc = ble_ll_sched_insert(sch, 0, preempt_any_except_conn);
+    //rc = ble_ll_sched_insert(sch, 0, preempt_any_except_conn);
+    rc = ble_ll_sched_insert(sch, 0, preempt_none);
 #if MYNEWT_VAL(BLE_LL_CONN_STRICT_SCHED)
     /* Store new anchor point for strict scheduling if successfully scheduled
      * reference connection.
