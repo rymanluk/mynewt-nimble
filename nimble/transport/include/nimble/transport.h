@@ -58,6 +58,7 @@ int ble_transport_register_put_acl_from_ll_cb(os_mempool_put_fn *cb);
 int ble_transport_to_ll_cmd(void *buf);
 int ble_transport_to_ll_acl(struct os_mbuf *om);
 int ble_transport_to_ll_iso(struct os_mbuf *om);
+int ble_transport_to_ll_iso_batch(struct os_mbuf **oms, int num);
 int ble_transport_to_hs_evt(void *buf);
 int ble_transport_to_hs_acl(struct os_mbuf *om);
 int ble_transport_to_hs_iso(struct os_mbuf *om);

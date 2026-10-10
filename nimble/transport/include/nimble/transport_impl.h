@@ -32,6 +32,7 @@ extern void ble_transport_hs_init(void);
 extern int ble_transport_to_ll_cmd_impl(void *buf);
 extern int ble_transport_to_ll_acl_impl(struct os_mbuf *om);
 extern int ble_transport_to_ll_iso_impl(struct os_mbuf *om);
+extern int ble_transport_to_ll_iso_batch_impl(struct os_mbuf **oms, int num);
 extern int ble_transport_to_hs_evt_impl(void *buf);
 extern int ble_transport_to_hs_acl_impl(struct os_mbuf *om);
 extern int ble_transport_to_hs_iso_impl(struct os_mbuf *om);

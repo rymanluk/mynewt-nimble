@@ -520,6 +520,16 @@ ble_transport_to_ll_iso(struct os_mbuf *om)
 }
 
 int
+ble_transport_to_ll_iso_batch(struct os_mbuf **oms, int num)
+{
+    int i;
+    for (i = 0; i < num; i++) {
+        ble_monitor_send_om(BLE_MONITOR_OPCODE_ISO_TX_PKT, oms[i]);
+    }
+    return ble_transport_to_ll_iso_batch_impl(oms, num);
+}
+
+int
 ble_transport_to_hs_acl(struct os_mbuf *om)
 {
     ble_monitor_send_om(BLE_MONITOR_OPCODE_ACL_RX_PKT, om);

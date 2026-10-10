@@ -66,6 +66,12 @@ ble_transport_to_ll_iso(struct os_mbuf *om)
 }
 
 static inline int
+ble_transport_to_ll_iso_batch(struct os_mbuf **oms, int num)
+{
+    return ble_transport_to_ll_iso_batch_impl(oms, num);
+}
+
+static inline int
 ble_transport_to_hs_evt(void *buf)
 {
     return ble_transport_to_hs_evt_impl(buf);

@@ -357,6 +357,25 @@ ble_transport_register_put_acl_from_ll_cb(os_mempool_put_fn (*cb))
     return 0;
 }
 
+#if !BLE_TRANSPORT_IPC_ON_HS
+int
+ble_transport_to_ll_iso_batch_impl(struct os_mbuf **oms, int num)
+{
+    int ret = 0;
+    int rc;
+    int i;
+
+    for (i = 0; i < num; i++) {
+        rc = ble_transport_to_ll_iso_impl(oms[i]);
+        if (rc && !ret) {
+            ret = rc;
+        }
+    }
+
+    return ret;
+}
+#endif
+
 #if BLE_TRANSPORT_IPC
 uint8_t
 ble_transport_ipc_buf_evt_type_get(void *buf)
