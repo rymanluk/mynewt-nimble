@@ -21,6 +21,7 @@
 #define _HCI_IPC_H_
 
 #include <stdint.h>
+#include <os/queue.h>
 
 #define HCI_IPC_TYPE_CMD                0x01
 #define HCI_IPC_TYPE_ACL                0x02
@@ -28,6 +29,7 @@
 #define HCI_IPC_TYPE_EVT_DISCARDABLE    0x05
 #define HCI_IPC_TYPE_EVT_IN_CMD         0x06
 #define HCI_IPC_TYPE_ISO                0x07
+#define HCI_IPC_TYPE_ISO_BATCH          0x08
 
 struct __attribute__((packed)) hci_ipc_hdr {
     uint8_t type;
@@ -44,6 +46,9 @@ struct hci_ipc_sm {
         uint8_t *buf;
         struct os_mbuf *om;
     };
+
+    STAILQ_HEAD(, os_mbuf_pkthdr) iso_batch_q;
+    uint16_t iso_batch_rem;
 };
 
 struct hci_ipc_shm {

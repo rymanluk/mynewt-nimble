@@ -90,6 +90,43 @@ hci_ipc_has_hdr(struct hci_ipc_sm *sm)
     return sm->hdr_len == sizeof(sm->hdr);
 }
 
+#if MYNEWT_VAL(BLE_CONTROLLER)
+static void
+hci_ipc_iso_batch_start(struct hci_ipc_sm *sm)
+{
+    assert(sm->iso_batch_rem == 0);
+    assert(STAILQ_EMPTY(&sm->iso_batch_q));
+
+    sm->iso_batch_rem = sm->hdr.length;
+
+    sm->hdr.type = 0;
+    sm->hdr.length = 0;
+    sm->hdr_len = 0;
+}
+
+static void
+hci_ipc_iso_batch_add(struct hci_ipc_sm *sm, struct os_mbuf *om)
+{
+    struct os_mbuf_pkthdr *pkthdr;
+    os_sr_t sr;
+
+    STAILQ_INSERT_TAIL(&sm->iso_batch_q, OS_MBUF_PKTHDR(om), omp_next);
+
+    sm->iso_batch_rem--;
+    if (sm->iso_batch_rem > 0) {
+        return;
+    }
+
+    /* Deliver whole batch at once so ISO event cannot start in between */
+    OS_ENTER_CRITICAL(sr);
+    while ((pkthdr = STAILQ_FIRST(&sm->iso_batch_q))) {
+        STAILQ_REMOVE_HEAD(&sm->iso_batch_q, omp_next);
+        ble_transport_to_ll_iso(OS_MBUF_PKTHDR_TO_MBUF(pkthdr));
+    }
+    OS_EXIT_CRITICAL(sr);
+}
+#endif
+
 static void
 hci_ipc_frame(struct hci_ipc_sm *sm)
 {
@@ -119,7 +156,11 @@ hci_ipc_frame(struct hci_ipc_sm *sm)
 #endif
     case HCI_IPC_TYPE_ISO:
 #if MYNEWT_VAL(BLE_CONTROLLER)
-        ble_transport_to_ll_iso(sm->om);
+        if (sm->iso_batch_rem) {
+            hci_ipc_iso_batch_add(sm, sm->om);
+        } else {
+            ble_transport_to_ll_iso(sm->om);
+        }
 #else
         ble_transport_to_hs_iso(sm->om);
 #endif
@@ -156,6 +197,12 @@ hci_ipc_copy_to_hdr(struct hci_ipc_sm *sm, const uint8_t *buf, uint16_t len)
     sm->hdr_len += len;
 
     if (hci_ipc_has_hdr(sm)) {
+#if MYNEWT_VAL(BLE_CONTROLLER)
+        if (sm->hdr.type == HCI_IPC_TYPE_ISO_BATCH) {
+            hci_ipc_iso_batch_start(sm);
+            return len;
+        }
+#endif
         hci_ipc_alloc(sm);
     }
 
@@ -229,6 +276,7 @@ hci_ipc_init(volatile struct hci_ipc_shm *shm, struct hci_ipc_sm *sm)
 
     g_ipc_shm = shm;
     memset(sm, 0, sizeof(*sm));
+    STAILQ_INIT(&sm->iso_batch_q);
 
 #if MYNEWT_VAL(BLE_CONTROLLER)
     while (shm->n2a_num_evt_disc == 0) {

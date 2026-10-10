@@ -80,7 +80,7 @@ nrf5340_ble_hci_acl_tx(struct os_mbuf *om)
 
 #if !MYNEWT_VAL(BLE_CONTROLLER)
 static int
-nrf5340_ble_hci_iso_tx(struct os_mbuf *om)
+nrf5340_ble_hci_iso_write(struct os_mbuf *om, bool last)
 {
     struct hci_ipc_hdr hdr;
     struct os_mbuf *x;
@@ -93,7 +93,7 @@ nrf5340_ble_hci_iso_tx(struct os_mbuf *om)
     if (rc == 0) {
         x = om;
         while (x) {
-            rc = ipc_nrf5340_write(IPC_TX_CHANNEL, x->om_data, x->om_len, true);
+            rc = ipc_nrf5340_write(IPC_TX_CHANNEL, x->om_data, x->om_len, last);
             if (rc < 0) {
                 break;
             }
@@ -104,6 +104,42 @@ nrf5340_ble_hci_iso_tx(struct os_mbuf *om)
     os_mbuf_free_chain(om);
 
     return (rc < 0) ? BLE_ERR_MEM_CAPACITY : 0;
+}
+
+static int
+nrf5340_ble_hci_iso_tx(struct os_mbuf *om)
+{
+    return nrf5340_ble_hci_iso_write(om, true);
+}
+
+static int
+nrf5340_ble_hci_iso_batch_tx(struct os_mbuf **oms, int num)
+{
+    struct hci_ipc_hdr hdr;
+    int rc = 0;
+    int i;
+
+    if (num == 1) {
+        return nrf5340_ble_hci_iso_tx(oms[0]);
+    }
+
+    if (num > 0) {
+        hdr.type = HCI_IPC_TYPE_ISO_BATCH;
+        hdr.length = num;
+        if (ipc_nrf5340_write(IPC_TX_CHANNEL, &hdr, sizeof(hdr), false) < 0) {
+            rc = BLE_ERR_MEM_CAPACITY;
+        }
+    }
+
+    for (i = 0; i < num; i++) {
+        if (rc) {
+            os_mbuf_free_chain(oms[i]);
+        } else {
+            rc = nrf5340_ble_hci_iso_write(oms[i], i == num - 1);
+        }
+    }
+
+    return rc;
 }
 #endif
 
@@ -204,6 +240,12 @@ int
 ble_transport_to_ll_iso_impl(struct os_mbuf *om)
 {
     return nrf5340_ble_hci_iso_tx(om);
+}
+
+int
+ble_transport_to_ll_iso_batch_impl(struct os_mbuf **oms, int num)
+{
+    return nrf5340_ble_hci_iso_batch_tx(oms, num);
 }
 
 void
